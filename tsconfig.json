@@ -1,0 +1,56 @@
+{
+  "compilerOptions": {
+    /* 基本选项 */
+    "target": "ES2020",                       /* 指定ECMAScript目标版本 */
+    "module": "ES2020",                       /* 指定模块代码生成方式 */
+    "lib": [                                  /* 指定要包含的库文件 */
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "declaration": true,                      /* 生成相应的'.d.ts'文件 */
+    "sourceMap": true,                        /* 生成相应的'.map'文件 */
+    "outDir": "./dist",                       /* 指定输出目录 */
+    "rootDir": "./src",                       /* 指定输入文件的根目录 */
+    
+    /* 严格类型检查选项 */
+    "strict": true,                           /* 启用所有严格类型检查选项 */
+    "noImplicitAny": true,                    /* 在表达式和声明上有隐含的any类型时报错 */
+    "strictNullChecks": true,                 /* 启用严格的null检查 */
+    "strictFunctionTypes": true,              /* 启用严格的函数类型检查 */
+    "strictBindCallApply": true,              /* 启用严格的'bind', 'call', 和'apply'方法的检查 */
+    "strictPropertyInitialization": true,      /* 启用类属性初始化的严格检查 */
+    "noImplicitThis": true,                   /* 当this表达式的值为any时，生成一个错误 */
+    "alwaysStrict": true,                     /* 以严格模式解析并为每个源文件生成"use strict"语句 */
+    
+    /* 额外的检查 */
+    "noUnusedLocals": true,                   /* 有未使用的变量时，抛出错误 */
+    "noUnusedParameters": true,               /* 有未使用的参数时，抛出错误 */
+    "noImplicitReturns": true,                /* 并不是所有函数里的代码都有返回值时，抛出错误 */
+    "noFallthroughCasesInSwitch": true,       /* 报告switch语句的fallthrough错误 */
+    "noUncheckedIndexedAccess": true,         /* 在索引签名结果中包含undefined */
+    
+    /* 模块解析选项 */
+    "moduleResolution": "node",               /* 选择模块解析策略 */
+    "baseUrl": "./",                          /* 用于解析非相对模块名称的基目录 */
+    "esModuleInterop": true,                  /* 启用CommonJS和ES模块之间的互操作性 */
+    "resolveJsonModule": true,                /* 允许导入.json文件 */
+    
+    /* 实验性选项 */
+    "experimentalDecorators": true,           /* 启用实验性的ES装饰器 */
+    "emitDecoratorMetadata": true,            /* 为装饰器提供元数据的支持 */
+    
+    /* 高级选项 */
+    "skipLibCheck": true,                     /* 跳过声明文件的类型检查 */
+    "forceConsistentCasingInFileNames": true  /* 禁止对同一个文件的不一致的引用 */
+  },
+  "include": [
+    "src/**/*"                               /* 指定要编译的文件 */
+  ],
+  "exclude": [
+    "node_modules",                          /* 指定要排除的文件 */
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
+}
