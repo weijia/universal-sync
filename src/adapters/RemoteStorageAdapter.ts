@@ -1,5 +1,5 @@
 import PouchDB from 'pouchdb';
-import { SyncAdapter, SyncStatus, SyncEventData } from '../interfaces/SyncAdapter';
+import { SyncAdapter } from '../interfaces/SyncAdapter';
 import { BaseSyncAdapter } from './BaseSyncAdapter';
 
 /**
@@ -84,9 +84,7 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       
       // 解析用户地址，获取存储服务器地址
       // 在实际实现中，这里应该使用WebFinger协议查询用户的RemoteStorage端点
-      const [username, domain] = config.userAddress.split('@');
-      const storageUrl = `https://${domain}/storage/${username}`;
-      
+      config.userAddress.split('@'); // 仅验证地址格式
       // 验证连接
       // 这里应该使用RemoteStorage协议验证连接是否有效
       
@@ -97,7 +95,7 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       this.updateStatus({ status: 'connected' });
       
       // 触发连接成功事件
-      this.triggerEvent('connected');
+      this.dispatchEvent('connected', {});
       
       return true;
     } catch (error) {
@@ -111,7 +109,7 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       });
       
       // 触发连接失败事件
-      this.triggerEvent('connection-error', {
+      this.dispatchEvent('connection-error', {
         error: {
           message: error instanceof Error ? error.message : '连接失败',
           details: error
@@ -167,8 +165,8 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
     // 更新状态
     this.updateStatus({ status: 'idle' });
     
-    // 触发停止事件
-    this.triggerEvent('sync-stopped');
+          // 触发停止事件
+          this.dispatchEvent('sync-stopped', {});
   }
   
   /**
@@ -183,20 +181,8 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       // 更新状态
       this.updateStatus({ status: 'syncing', progress: 0 });
       
-      // 模拟同步进度更新
-      const updateProgress = (progress: number) => {
-        this.updateStatus({ status: 'syncing', progress });
-        this.triggerEvent('sync-progress', { progress });
-      };
-      
-      // 模拟同步过程
-      for (let i = 0; i <= 10; i++) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        updateProgress(i * 10);
-      }
-      
       // 执行一次性同步
-      const result = await this.localDB.sync(this.remoteDB, {
+      await this.localDB.sync(this.remoteDB, {
         live: false,
         retry: true,
         batches_limit: 5,
@@ -207,7 +193,7 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       this.updateStatus({ status: 'completed', progress: 100 });
       
       // 触发完成事件
-      this.triggerEvent('sync-complete');
+      this.dispatchEvent('sync-complete', {});
       
     } catch (error) {
       // 更新状态
@@ -220,33 +206,12 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       });
       
       // 触发错误事件
-      this.triggerEvent('sync-error', {
+      this.dispatchEvent('sync-error', {
         error: {
-          message: error instanceof Error ? error.message : '同步失败',
+          message: error instanceof Error ? error.message : '同步失败', 
           details: error
         }
       });
     }
-  }
-  
-  /**
-   * 计算同步进度
-   * @param info 同步信息
-   */
-  private calculateProgress(info: any): number {
-    // 这里应该根据同步信息计算实际进度
-    // 例如，可以根据已同步的文档数与总文档数的比例来计算
-    
-    // 如果有文档写入和读取信息
-    if (info && typeof info.docs_written === 'number' && typeof info.docs_read === 'number') {
-      const total = info.docs_read + info.docs_written;
-      const current = info.docs_written;
-      
-      // 确保进度不超过99%，留1%给最终完成状态
-      return Math.min(Math.round((current / total) * 100), 99);
-    }
-    
-    // 如果没有具体的进度信息，返回一个模拟的进度
-    return 50;
   }
 }

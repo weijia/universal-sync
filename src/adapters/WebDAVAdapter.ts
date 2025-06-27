@@ -67,7 +67,7 @@ export class WebDAVAdapter implements SyncAdapter {
    * WebDAV客户端
    */
   private client: any = null;
-  
+
   /**
    * 同步配置
    */
@@ -145,11 +145,11 @@ export class WebDAVAdapter implements SyncAdapter {
   }
   
   /**
-   * 触发事件
+   * 分发事件
    * @param event 事件名称
    * @param data 事件数据
    */
-  private triggerEvent(event: string, data: Partial<SyncEventData> = {}): void {
+  private dispatchEvent(event: string, data: Partial<SyncEventData> = {}): void {
     const listeners = this.eventListeners.get(event);
     
     if (listeners) {
@@ -208,7 +208,7 @@ export class WebDAVAdapter implements SyncAdapter {
       this.updateStatus({ status: 'connected' });
       
       // 触发连接成功事件
-      this.triggerEvent('connect-success');
+      this.dispatchEvent('connect-success');
       
       return true;
     } catch (error) {
@@ -222,7 +222,7 @@ export class WebDAVAdapter implements SyncAdapter {
       });
       
       // 触发连接错误事件
-      this.triggerEvent('connect-error', {
+      this.dispatchEvent('connect-error', {
         error: {
           message: error instanceof Error ? error.message : '连接失败',
           details: error
@@ -298,21 +298,21 @@ export class WebDAVAdapter implements SyncAdapter {
         this.updateStatus({ status: 'syncing', progress });
         
         // 触发进度事件
-        this.triggerEvent('sync-progress', { progress });
+        this.dispatchEvent('sync-progress', { progress });
       })
       .on('paused', () => {
         // 更新状态
         this.updateStatus({ status: 'paused' });
         
         // 触发暂停事件
-        this.triggerEvent('sync-paused');
+        this.dispatchEvent('sync-paused');
       })
       .on('active', () => {
         // 更新状态
         this.updateStatus({ status: 'syncing' });
         
         // 触发活动事件
-        this.triggerEvent('sync-active');
+        this.dispatchEvent('sync-active');
       })
       .on('denied', error => {
         // 更新状态
@@ -325,19 +325,19 @@ export class WebDAVAdapter implements SyncAdapter {
         });
         
         // 触发拒绝事件
-        this.triggerEvent('sync-denied', {
+        this.dispatchEvent('sync-denied', {
           error: {
             message: '同步被拒绝',
             details: error
           }
         });
       })
-      .on('complete', info => {
+      .on('complete', _info => {
         // 更新状态
         this.updateStatus({ status: 'completed', progress: 100 });
         
         // 触发完成事件
-        this.triggerEvent('sync-complete');
+        this.dispatchEvent('sync-complete');
       })
       .on('error', error => {
         // 更新状态
@@ -350,7 +350,7 @@ export class WebDAVAdapter implements SyncAdapter {
         });
         
         // 触发错误事件
-        this.triggerEvent('sync-error', {
+        this.dispatchEvent('sync-error', {
           error: {
             message: '同步错误',
             details: error
@@ -374,7 +374,7 @@ export class WebDAVAdapter implements SyncAdapter {
       });
       
       // 触发错误事件
-      this.triggerEvent('sync-error', {
+      this.dispatchEvent('sync-error', {
         error: {
           message: error instanceof Error ? error.message : '同步失败',
           details: error
@@ -411,7 +411,7 @@ export class WebDAVAdapter implements SyncAdapter {
     this.updateStatus({ status: 'idle', progress: 0 });
     
     // 触发停止事件
-    this.triggerEvent('sync-stopped');
+    this.dispatchEvent('sync-stopped');
   }
   
   /**
@@ -445,13 +445,13 @@ export class WebDAVAdapter implements SyncAdapter {
       this.updateStatus({ status: 'syncing', progress: 0 });
       
       // 执行一次性同步
-      const result = await this.localDB.sync(this.remoteDB);
+      await this.localDB.sync(this.remoteDB);
       
       // 更新状态
       this.updateStatus({ status: 'completed', progress: 100 });
       
       // 触发完成事件
-      this.triggerEvent('sync-complete');
+      this.dispatchEvent('sync-complete');
       
     } catch (error) {
       // 更新状态
@@ -464,7 +464,7 @@ export class WebDAVAdapter implements SyncAdapter {
       });
       
       // 触发错误事件
-      this.triggerEvent('sync-error', {
+      this.dispatchEvent('sync-error', {
         error: {
           message: error instanceof Error ? error.message : '同步失败',
           details: error

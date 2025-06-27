@@ -600,7 +600,7 @@ export class SyncController extends HTMLElement {
     
     // 更新进度条
     if (status.progress !== undefined) {
-      this.elements.progressBar.style.width = `${status.progress}%`;
+      (this.elements.progressBar as HTMLElement).style.width = `${status.progress}%`;
     }
     
     // 更新按钮状态
@@ -614,14 +614,14 @@ export class SyncController extends HTMLElement {
    */
   private showError(message: string) {
     this.elements.errorMessage.textContent = message;
-    this.elements.errorMessage.style.display = 'block';
+    (this.elements.errorMessage as HTMLElement).style.display = 'block';
   }
   
   /**
    * 隐藏错误消息
    */
   private hideError() {
-    this.elements.errorMessage.style.display = 'none';
+    (this.elements.errorMessage as HTMLElement).style.display = 'none';
   }
   
   /**

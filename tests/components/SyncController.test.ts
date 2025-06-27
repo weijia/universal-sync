@@ -21,7 +21,7 @@ class MockAdapter implements SyncAdapter {
     return true;
   }
   
-  async startSync(localDB: PouchDB.Database): Promise<void> {
+  async startSync(_localDB: PouchDB.Database): Promise<void> {
     this.status = { status: 'syncing', progress: 0 };
     this.dispatchEvent('sync-progress', { status: this.status });
     
@@ -109,7 +109,11 @@ describe('SyncController', () => {
       const adapterElements = adaptersContainer?.querySelectorAll('.sync-adapter');
       
       expect(adapterElements?.length).toBe(1);
-      expect(adapterElements?.[0].textContent).toContain('MockAdapter');
+      const firstAdapter = adapterElements?.[0];
+      if (!firstAdapter) {
+        throw new Error('First adapter element not found');
+      }
+      expect(firstAdapter.textContent).toContain('MockAdapter');
     });
     
     test('应该选择默认适配器', () => {
@@ -134,11 +138,21 @@ describe('SyncController', () => {
       expect(adapterElements?.length).toBe(2);
       
       // 点击第二个适配器
-      adapterElements?.[1].dispatchEvent(new MouseEvent('click'));
+      const secondAdapter = adapterElements?.[1];
+      if (!secondAdapter) {
+        throw new Error('Second adapter element not found');
+      }
+      secondAdapter.dispatchEvent(new MouseEvent('click'));
       
       // 验证选择状态
-      expect(adapterElements?.[0].classList.contains('active')).toBe(false);
-      expect(adapterElements?.[1].classList.contains('active')).toBe(true);
+      const firstAdapter = adapterElements?.[0];
+      
+      if (!firstAdapter || !secondAdapter) {
+        throw new Error('Adapter elements not found');
+      }
+      
+      expect(firstAdapter.classList.contains('active')).toBe(false);
+      expect(secondAdapter.classList.contains('active')).toBe(true);
     });
   });
   
@@ -227,7 +241,7 @@ describe('SyncController', () => {
       await new Promise(resolve => setTimeout(resolve, 150));
       
       // 验证进度更新
-      expect(progressBar?.style.width).toBe('100%');
+      expect((progressBar as HTMLElement)?.style.width).toBe('100%');
     });
     
     test('应该显示错误状态', async () => {
@@ -236,7 +250,7 @@ describe('SyncController', () => {
       
       // 验证错误显示
       const errorMessage = controller.shadowRoot?.querySelector('.sync-error');
-      expect(errorMessage?.style.display).toBe('block');
+      expect((errorMessage as HTMLElement)?.style.display).toBe('block');
       expect(errorMessage?.textContent).toBe('连接失败');
     });
   });

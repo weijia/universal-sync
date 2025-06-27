@@ -74,9 +74,10 @@ export abstract class BaseSyncAdapter implements SyncAdapter {
    * @param event 事件名称
    * @param data 事件数据
    */
-  protected dispatchEvent(event: string, data: Omit<SyncEventData, 'type'>): void {
+  protected dispatchEvent(event: string, data: Omit<SyncEventData, 'type' | 'status'>): void {
     const eventData: SyncEventData = {
       type: event,
+      status: this.status,
       ...data
     };
     
