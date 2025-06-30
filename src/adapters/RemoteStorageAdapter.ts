@@ -1,6 +1,13 @@
 import PouchDB from 'pouchdb';
 import { SyncAdapter } from '../interfaces/SyncAdapter';
 import { BaseSyncAdapter } from './BaseSyncAdapter';
+import { discoverRemoteStorage, RemoteStorageInfo } from '../utils/remoteStorageDiscovery';
+// import { authorizeRemoteStorage } from '../utils/remoteStorageAuth';
+
+interface RemoteStorageToken {
+  accessToken: string;
+  tokenType: string;
+}
 
 /**
  * RemoteStorage适配器配置
@@ -64,6 +71,16 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
   private autoSyncTimer: NodeJS.Timeout | null = null;
   
   /**
+   * RemoteStorage服务器信息
+   */
+  private remoteInfo: RemoteStorageInfo | null = null;
+  
+  /**
+   * 认证令牌
+   */
+  private token: RemoteStorageToken | null = null;
+  
+  /**
    * 构造函数
    */
   constructor() {
@@ -82,14 +99,34 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       // 保存配置
       this.config = config;
       
-      // 解析用户地址，获取存储服务器地址
-      // 在实际实现中，这里应该使用WebFinger协议查询用户的RemoteStorage端点
-      config.userAddress.split('@'); // 仅验证地址格式
-      // 验证连接
-      // 这里应该使用RemoteStorage协议验证连接是否有效
+      // 1. 发现RemoteStorage端点
+      const remoteInfo = await discoverRemoteStorage(config.userAddress);
       
-      // 模拟验证过程
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 2. 验证令牌有效性
+      // 这里简化处理，实际应该验证令牌是否有效
+      if (!config.token) {
+        throw new Error('无效的访问令牌');
+      }
+      
+      // 3. 保存连接信息
+      this.remoteInfo = remoteInfo;
+      this.token = {
+        accessToken: config.token,
+        tokenType: 'Bearer'
+      };
+      
+      // 4. 测试连接
+      const testResponse = await fetch(`${remoteInfo.server}${remoteInfo.webdavPath}/`, {
+        method: 'PROPFIND',
+        headers: {
+          'Authorization': `Bearer ${config.token}`,
+          'Depth': '0'
+        }
+      });
+      
+      if (!testResponse.ok) {
+        throw new Error(`连接测试失败: ${testResponse.status} ${testResponse.statusText}`);
+      }
       
       // 更新状态
       this.updateStatus({ status: 'connected' });
@@ -126,18 +163,12 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
    */
   async startSync(localDB: PouchDB.Database): Promise<void> {
     // 检查是否已连接
-    if (!this.config) {
+    if (!this.config || !this.remoteInfo || !this.token) {
       throw new Error('请先连接到RemoteStorage服务器');
     }
     
     // 保存本地数据库实例
     this.localDB = localDB;
-    
-    // 创建远程数据库实例
-    // 在实际实现中，这里应该使用PouchDB的自定义适配器
-    // 或者自定义一个适配器来与RemoteStorage API交互
-    // 这里我们使用内存数据库模拟
-    this.remoteDB = new PouchDB('remotestorage-remote', { adapter: 'memory' });
     
     // 执行一次同步
     await this.triggerSync();
@@ -147,6 +178,13 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
       this.autoSyncTimer = setInterval(() => {
         this.triggerSync().catch(error => {
           console.error('自动同步失败:', error);
+          this.updateStatus({ 
+            status: 'error',
+            error: {
+              message: error instanceof Error ? error.message : '自动同步失败',
+              details: error
+            }
+          });
         });
       }, this.config.autoSyncInterval);
     }
@@ -173,28 +211,49 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
    * 触发同步
    */
   private async triggerSync(): Promise<void> {
-    if (!this.localDB || !this.remoteDB) {
-      throw new Error('本地数据库或远程数据库未初始化');
+    if (!this.localDB || !this.remoteInfo || !this.token) {
+      throw new Error('未连接到RemoteStorage服务器');
     }
     
     try {
       // 更新状态
       this.updateStatus({ status: 'syncing', progress: 0 });
       
-      // 执行一次性同步
-      await this.localDB.sync(this.remoteDB, {
-        live: false,
-        retry: true,
-        batches_limit: 5,
-        back_off_function: (delay: number) => delay * 2
-      });
+      // 1. 获取远程文档列表
+      const remoteDocs = await this.listRemoteDocuments();
+      this.updateStatus({ status: 'syncing', progress: 30 });
+      
+      // 2. 获取本地文档列表
+      const localDocs = await this.localDB.allDocs({ include_docs: true });
+      this.updateStatus({ status: 'syncing', progress: 60 });
+      
+      // 3. 同步远程到本地
+      for (const remoteDoc of remoteDocs) {
+        const localDoc = localDocs.rows.find(row => row.id === remoteDoc._id);
+        
+        // 冲突解决策略：远程优先
+        if (!localDoc || !localDoc.doc || !localDoc.doc._rev || remoteDoc._rev > localDoc.doc._rev) {
+          await this.localDB.put(remoteDoc);
+        }
+      }
+      
+      // 4. 同步本地到远程
+      for (const localRow of localDocs.rows) {
+        const remoteDoc = remoteDocs.find(doc => doc._id === localRow.id);
+        
+        // 冲突解决策略：本地优先
+        if (!localRow.doc || !localRow.doc._rev) continue;
+        
+        if (!remoteDoc || localRow.doc._rev > remoteDoc._rev) {
+          await this.putRemoteDocument(localRow.doc);
+        }
+      }
       
       // 更新状态
       this.updateStatus({ status: 'completed', progress: 100 });
       
       // 触发完成事件
       this.dispatchEvent('sync-complete', {});
-      
     } catch (error) {
       // 更新状态
       this.updateStatus({ 
@@ -212,6 +271,55 @@ export class RemoteStorageAdapter extends BaseSyncAdapter implements SyncAdapter
           details: error
         }
       });
+    }
+  }
+
+  /**
+   * 获取远程文档列表
+   */
+  private async listRemoteDocuments(): Promise<any[]> {
+    if (!this.remoteInfo || !this.token) {
+      throw new Error('未连接到RemoteStorage服务器');
+    }
+    
+    const response = await fetch(`${this.remoteInfo.server}${this.remoteInfo.webdavPath}/`, {
+      method: 'PROPFIND',
+      headers: {
+        'Authorization': `Bearer ${this.token.accessToken}`,
+        'Depth': '1',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`获取远程文档列表失败: ${response.status} ${response.statusText}`);
+    }
+    
+    // 解析WebDAV响应并转换为文档数组
+    // 这里简化处理，实际应该解析WebDAV响应
+    const data = await response.json();
+    return data.items || [];
+  }
+
+  /**
+   * 上传文档到远程存储
+   */
+  private async putRemoteDocument(doc: any): Promise<void> {
+    if (!this.remoteInfo || !this.token) {
+      throw new Error('未连接到RemoteStorage服务器');
+    }
+    
+    const response = await fetch(`${this.remoteInfo.server}${this.remoteInfo.webdavPath}/${encodeURIComponent(doc._id)}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${this.token.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(doc)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`保存远程文档失败: ${response.status} ${response.statusText}`);
     }
   }
 }
